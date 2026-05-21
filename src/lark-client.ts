@@ -53,8 +53,8 @@ export class LarkClient {
       });
 
       const params = new URLSearchParams({
-        start_time: startTime.getTime().toString(),
-        end_time: endTime.getTime().toString(),
+        start_time: Math.floor(startTime.getTime() / 1000).toString(),
+        end_time: Math.floor(endTime.getTime() / 1000).toString(),
         page_size: '100',
       });
 
@@ -71,18 +71,36 @@ export class LarkClient {
       const data = await response.json() as any;
 
       if (data.code !== 0) {
-        throw new Error(`Failed to get calendar events: ${data.msg}`);
+        const errorMsg = `Failed to get calendar events: ${data.msg} (code: ${data.code})`;
+        logger.error('API error response', {
+          calendarId,
+          code: data.code,
+          msg: data.msg,
+        });
+        throw new Error(errorMsg);
       }
 
       const events: CalendarEvent[] = [];
       const items = data.data?.items || [];
 
       for (const item of items) {
+        // Convert timestamp from seconds to milliseconds if needed
+        let startTimestamp = item.start_time?.timestamp || '';
+        let endTimestamp = item.end_time?.timestamp || '';
+
+        // Ensure timestamps are in milliseconds
+        if (startTimestamp && startTimestamp.length === 10) {
+          startTimestamp = startTimestamp + '000';
+        }
+        if (endTimestamp && endTimestamp.length === 10) {
+          endTimestamp = endTimestamp + '000';
+        }
+
         events.push({
           id: item.event_id || '',
           summary: item.summary || '',
-          startTime: item.start_time?.timestamp || '',
-          endTime: item.end_time?.timestamp || '',
+          startTime: startTimestamp,
+          endTime: endTimestamp,
           attendees: item.attendees?.map((a: any) => a.open_id || '') || [],
           location: item.location?.name || '',
           description: item.description || '',
@@ -148,13 +166,25 @@ export class LarkClient {
         endTime: event.endTime,
       });
 
+      // Ensure timestamps are in milliseconds
+      let startTimestamp = event.startTime;
+      let endTimestamp = event.endTime;
+
+      // Convert to milliseconds if in seconds
+      if (startTimestamp.length === 10) {
+        startTimestamp = startTimestamp + '000';
+      }
+      if (endTimestamp.length === 10) {
+        endTimestamp = endTimestamp + '000';
+      }
+
       const body: any = {
         summary: event.summary,
         start_time: {
-          timestamp: event.startTime,
+          timestamp: startTimestamp,
         },
         end_time: {
-          timestamp: event.endTime,
+          timestamp: endTimestamp,
         },
       };
 
@@ -169,6 +199,11 @@ export class LarkClient {
       if (event.description) {
         body.description = event.description;
       }
+
+      logger.debug('Creating event with body', {
+        calendarId,
+        body: JSON.stringify(body),
+      });
 
       const response = await fetch(
         `${this.baseUrl}/calendar/v4/calendars/${calendarId}/events`,
@@ -185,7 +220,14 @@ export class LarkClient {
       const data = await response.json() as any;
 
       if (data.code !== 0) {
-        throw new Error(`Failed to create calendar event: ${data.msg}`);
+        const errorMsg = `Failed to create calendar event: ${data.msg} (code: ${data.code})`;
+        logger.error('API error response', {
+          calendarId,
+          code: data.code,
+          msg: data.msg,
+          summary: event.summary,
+        });
+        throw new Error(errorMsg);
       }
 
       logger.info('Successfully created calendar event', {

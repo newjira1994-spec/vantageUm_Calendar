@@ -34,6 +34,15 @@ jobs:
           LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
           EOF
 
+      - name: Install Lark CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/larksuite/lark-cli/main/install.sh | sh
+
+      - name: Configure Lark CLI
+        run: |
+          lark-cli config set app.id "${{ secrets.LARK_APP_ID }}"
+          lark-cli config set app.secret "${{ secrets.LARK_APP_SECRET }}"
+
       - name: Run calendar sync
         run: |
           chmod +x sync-with-lark-cli.sh

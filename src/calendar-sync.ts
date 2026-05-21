@@ -5,17 +5,17 @@ import { addDays } from 'date-fns';
 
 export class CalendarSync {
   private larkClient: LarkClient;
-  private boCoordinatorCalendarId: string;
-  private newJiraCalendarId: string;
+  private boCoordinatorUserId: string;
+  private newJiraUserId: string;
 
   constructor(
     larkClient: LarkClient,
-    boCoordinatorCalendarId: string,
-    newJiraCalendarId: string
+    boCoordinatorUserId: string,
+    newJiraUserId: string
   ) {
     this.larkClient = larkClient;
-    this.boCoordinatorCalendarId = boCoordinatorCalendarId;
-    this.newJiraCalendarId = newJiraCalendarId;
+    this.boCoordinatorUserId = boCoordinatorUserId;
+    this.newJiraUserId = newJiraUserId;
   }
 
   async sync(syncDaysForward: number): Promise<SyncResult> {
@@ -29,8 +29,8 @@ export class CalendarSync {
 
     try {
       logger.info('Starting calendar sync', {
-        boCoordinatorCalendarId: this.boCoordinatorCalendarId,
-        newJiraCalendarId: this.newJiraCalendarId,
+        boCoordinatorUserId: this.boCoordinatorUserId,
+        newJiraUserId: this.newJiraUserId,
         syncDaysForward,
       });
 
@@ -42,47 +42,48 @@ export class CalendarSync {
         endTime: endDate.toISOString(),
       });
 
-      // Get Bo Coordinator's events
-      const boEvents = await this.larkClient.getCalendarEvents(
-        this.boCoordinatorCalendarId,
+      // Get Bo Coordinator's busy periods
+      const boBusyPeriods = await this.larkClient.getFreeBusy(
+        this.boCoordinatorUserId,
         now,
         endDate
       );
 
-      logger.info('Fetched Bo Coordinator events', { count: boEvents.length });
+      logger.info('Fetched Bo Coordinator busy periods', { count: boBusyPeriods.length });
 
-      result.totalChecked = boEvents.length;
+      result.totalChecked = boBusyPeriods.length;
 
-      // Process each event
-      for (const boEvent of boEvents) {
+      // Process each busy period
+      for (const busyPeriod of boBusyPeriods) {
         try {
-          const eventStartTime = new Date(boEvent.startTime);
-          const eventEndTime = new Date(boEvent.endTime);
+          const eventStartTime = new Date(parseInt(busyPeriod.start) * 1000);
+          const eventEndTime = new Date(parseInt(busyPeriod.end) * 1000);
 
-          logger.info('Processing event', {
-            summary: boEvent.summary,
+          logger.info('Processing busy period', {
             startTime: eventStartTime.toISOString(),
             endTime: eventEndTime.toISOString(),
           });
 
           // Check if new jira's calendar is free during this time
           const isFree = await this.larkClient.checkAvailability(
-            this.newJiraCalendarId,
+            this.newJiraUserId,
             eventStartTime,
             eventEndTime
           );
 
           if (isFree) {
             // Create a new event in new jira's calendar
+            // Note: We need the actual calendar_id to create events
+            // For now, we'll use the user_id as calendar_id (primary calendar)
             const newEvent: CalendarEvent = {
               id: '',
               summary: 'from UM calendar',
-              startTime: boEvent.startTime,
-              endTime: boEvent.endTime,
-              attendees: [this.newJiraCalendarId],
+              startTime: busyPeriod.start,
+              endTime: busyPeriod.end,
+              attendees: [this.newJiraUserId],
             };
 
-            await this.larkClient.createEvent(this.newJiraCalendarId, newEvent);
+            await this.larkClient.createEvent(this.newJiraUserId, newEvent);
             result.created++;
 
             logger.info('Created new event', {
@@ -92,22 +93,20 @@ export class CalendarSync {
           } else {
             result.skipped++;
 
-            logger.info('Skipped event due to conflict', {
-              summary: boEvent.summary,
+            logger.info('Skipped period due to conflict', {
               startTime: eventStartTime.toISOString(),
             });
           }
         } catch (error) {
           result.failed++;
           const errorDetails: ErrorDetails = {
-            eventSummary: boEvent.summary,
-            eventTime: boEvent.startTime,
+            eventSummary: 'Busy period',
+            eventTime: busyPeriod.start,
             error: error instanceof Error ? error.message : String(error),
           };
           result.errors.push(errorDetails);
 
-          logger.error('Failed to process event', {
-            summary: boEvent.summary,
+          logger.error('Failed to process busy period', {
             error: errorDetails.error,
           });
         }

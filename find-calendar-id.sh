@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# 查找用户的日历 ID
+
+echo "=========================================="
+echo "   查找 BO Coordinator 的日历"
+echo "=========================================="
+echo ""
+
+# BO Coordinator 的用户 ID
+USER_ID="ou_c6bdc791b875c3af1775a652bcf3b638"
+
+echo "BO Coordinator 用户 ID: $USER_ID"
+echo ""
+echo "查找方法："
+echo ""
+echo "方法 1: 使用 Lark CLI 查看用户日历"
+echo "  lark-cli calendar calendar-list --user-id $USER_ID"
+echo ""
+echo "方法 2: 查看用户主日历"
+echo "  用户主日历 ID 通常等于用户 ID"
+echo "  尝试: $USER_ID"
+echo ""
+echo "方法 3: 通过 Lark 界面查看"
+echo "  1. 打开 BO Coordinator 的个人资料"
+echo "  2. 查看日历设置"
+echo "  3. 获取日历 ID"
+echo ""
+echo "=========================================="
+echo ""
+echo "💡 提示："
+echo ""
+echo "用户 ID (open_id) 和日历 ID (calendar_id) 是不同的："
+echo "  - 用户 ID: ou_xxxxx (用于标识用户)"
+echo "  - 日历 ID: 可能是 ou_xxxxx 或其他格式"
+echo ""
+echo "主日历的 calendar_id 通常等于用户的 open_id"
+echo "共享日历的 calendar_id 可能不同"
+echo ""
+echo "=========================================="

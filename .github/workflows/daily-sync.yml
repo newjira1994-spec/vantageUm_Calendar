@@ -35,7 +35,9 @@ jobs:
           EOF
 
       - name: Run calendar sync
-        run: npm run sync
+        run: |
+          chmod +x sync-with-lark-cli.sh
+          ./sync-with-lark-cli.sh
 
       - name: Upload logs
         if: always()

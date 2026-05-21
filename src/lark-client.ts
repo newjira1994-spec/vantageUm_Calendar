@@ -122,31 +122,117 @@ export class LarkClient {
     }
   }
 
-  async checkAvailability(calendarId: string, startTime: Date, endTime: Date): Promise<boolean> {
+  async getFreeBusy(userId: string, startTime: Date, endTime: Date): Promise<Array<{start: string, end: string}>> {
+    try {
+      if (!this.tenantAccessToken) {
+        await this.getTenantAccessToken();
+      }
+
+      logger.info('Checking freebusy status', {
+        userId,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      });
+
+      const body = {
+        time_min: Math.floor(startTime.getTime() / 1000).toString(),
+        time_max: Math.floor(endTime.getTime() / 1000).toString(),
+        user_ids: [userId],
+      };
+
+      logger.debug('Freebusy request body', { body: JSON.stringify(body) });
+
+      const response = await fetch(
+        `${this.baseUrl}/calendar/v4/freebusy`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.tenantAccessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      const responseText = await response.text();
+      logger.info('Freebusy API response', {
+        status: response.status,
+        statusText: response.statusText,
+        bodyLength: responseText.length,
+        bodyPreview: responseText.substring(0, 200),
+      });
+
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        logger.error('Failed to parse JSON response', {
+          responseText: responseText.substring(0, 500),
+          parseError: parseError instanceof Error ? parseError.message : String(parseError),
+        });
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+      }
+
+      if (data.code !== 0) {
+        const errorMsg = `Failed to get freebusy: ${data.msg} (code: ${data.code})`;
+        logger.error('API error response', {
+          userId,
+          code: data.code,
+          msg: data.msg,
+        });
+        throw new Error(errorMsg);
+      }
+
+      const busyPeriods: Array<{start: string, end: string}> = [];
+      const ranges = data.data?.ranges || [];
+
+      for (const range of ranges) {
+        busyPeriods.push({
+          start: range.start_time?.timestamp || '',
+          end: range.end_time?.timestamp || '',
+        });
+      }
+
+      logger.info('Successfully got freebusy status', {
+        userId,
+        busyCount: busyPeriods.length,
+      });
+
+      return busyPeriods;
+    } catch (error) {
+      logger.error('Failed to get freebusy status', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  async checkAvailability(userId: string, startTime: Date, endTime: Date): Promise<boolean> {
     try {
       if (!this.tenantAccessToken) {
         await this.getTenantAccessToken();
       }
 
       logger.info('Checking calendar availability', {
-        calendarId,
+        userId,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
       });
 
-      const events = await this.getCalendarEvents(calendarId, startTime, endTime);
+      const busyPeriods = await this.getFreeBusy(userId, startTime, endTime);
 
-      const isFree = events.length === 0;
+      const isFree = busyPeriods.length === 0;
       logger.info('Calendar availability check result', {
-        calendarId,
+        userId,
         isFree,
-        eventCount: events.length,
+        busyCount: busyPeriods.length,
       });
 
       return isFree;
     } catch (error) {
       logger.error('Failed to check calendar availability', {
-        calendarId,
+        userId,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;

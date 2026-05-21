@@ -14,7 +14,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: '3.13'
+
       - name: Install Lark CLI and run sync
+        shell: bash -l {0}
         env:
           LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
           LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
@@ -23,13 +30,15 @@ jobs:
           SYNC_DAYS_FORWARD: ${{ vars.SYNC_DAYS_FORWARD || '7' }}
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}
         run: |
-          # Install Lark CLI
-          curl -fsSL https://raw.githubusercontent.com/larksuite/lark-cli/main/install.sh | sh
-          export PATH="$HOME/.lark-cli/bin:$PATH"
+          # Install Lark CLI via conda
+          conda install -c conda-forge gh -y
+          conda install -c conda-forge lark-cli -y || conda install -y lark-cli || echo "Lark CLI not available in conda"
 
-          # Configure Lark CLI
-          lark-cli config set app.id "$LARK_APP_ID"
-          lark-cli config set app.secret "$LARK_APP_SECRET"
+          # Configure Lark CLI (if available)
+          if command -v lark-cli &> /dev/null; then
+            lark-cli config set app.id "$LARK_APP_ID"
+            lark-cli config set app.secret "$LARK_APP_SECRET"
+          fi
 
           # Run sync script
           chmod +x sync-with-lark-cli.sh

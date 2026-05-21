@@ -14,41 +14,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Create .env file
-        run: |
-          cat > .env << EOF
-          LARK_APP_ID=${{ secrets.LARK_APP_ID }}
-          LARK_APP_SECRET=${{ secrets.LARK_APP_SECRET }}
-          BO_COORDINATOR_CALENDAR_ID=${{ vars.BO_COORDINATOR_CALENDAR_ID || 'ou_c6bdc791b875c3af1775a652bcf3b638' }}
-          NEW_JIRA_CALENDAR_ID=${{ vars.NEW_JIRA_CALENDAR_ID || 'ou_dc36b8ad99537b07510b9af57d152136' }}
-          SYNC_DAYS_FORWARD=${{ vars.SYNC_DAYS_FORWARD || '7' }}
-          LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
-          EOF
-
-      - name: Install Lark CLI
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/larksuite/lark-cli/main/install.sh | sh
-          echo "$HOME/.lark-cli/bin" >> $GITHUB_PATH
-
-      - name: Configure Lark CLI
+      - name: Install Lark CLI and run sync
         env:
           LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
           LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          BO_COORDINATOR_CALENDAR_ID: ${{ vars.BO_COORDINATOR_CALENDAR_ID || 'ou_c6bdc791b875c3af1775a652bcf3b638' }}
+          NEW_JIRA_CALENDAR_ID: ${{ vars.NEW_JIRA_CALENDAR_ID || 'ou_dc36b8ad99537b07510b9af57d152136' }}
+          SYNC_DAYS_FORWARD: ${{ vars.SYNC_DAYS_FORWARD || '7' }}
+          LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}
         run: |
+          # Install Lark CLI
+          curl -fsSL https://raw.githubusercontent.com/larksuite/lark-cli/main/install.sh | sh
+          export PATH="$HOME/.lark-cli/bin:$PATH"
+
+          # Configure Lark CLI
           lark-cli config set app.id "$LARK_APP_ID"
           lark-cli config set app.secret "$LARK_APP_SECRET"
 
-      - name: Run calendar sync
-        run: |
+          # Run sync script
           chmod +x sync-with-lark-cli.sh
           ./sync-with-lark-cli.sh
 

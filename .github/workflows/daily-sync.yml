@@ -1,0 +1,46 @@
+name: Daily Calendar Sync
+
+on:
+  schedule:
+    # Run at 9:00 AM UTC+7 (which is 2:00 AM UTC)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  sync-calendars:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          LARK_APP_ID=${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET=${{ secrets.LARK_APP_SECRET }}
+          BO_COORDINATOR_CALENDAR_ID=${{ vars.BO_COORDINATOR_CALENDAR_ID || 'ou_c6bdc791b875c3af1775a652bcf3b638' }}
+          NEW_JIRA_CALENDAR_ID=${{ vars.NEW_JIRA_CALENDAR_ID || 'ou_dc36b8ad99537b07510b9af57d152136' }}
+          SYNC_DAYS_FORWARD=${{ vars.SYNC_DAYS_FORWARD || '7' }}
+          LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
+          EOF
+
+      - name: Run calendar sync
+        run: npm run sync
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calendar-sync-logs
+          path: calendar-sync.log
+          retention-days: 30

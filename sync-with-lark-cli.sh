@@ -20,9 +20,15 @@ echo "=========================================="
 echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
 
-# 计算时间范围
+# 计算时间范围（兼容 Linux 和 macOS）
 START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-END_TIME=$(date -u -v+${SYNC_DAYS}d '+%Y-%m-%dT%H:%M:%SZ')
+if date -v+7d >/dev/null 2>&1; then
+  # macOS
+  END_TIME=$(date -u -v+${SYNC_DAYS}d '+%Y-%m-%dT%H:%M:%SZ')
+else
+  # Linux
+  END_TIME=$(date -u -d "+${SYNC_DAYS} days" '+%Y-%m-%dT%H:%M:%SZ')
+fi
 
 echo "时间范围："
 echo "  开始: $START_TIME"

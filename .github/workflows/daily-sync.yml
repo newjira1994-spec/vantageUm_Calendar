@@ -37,11 +37,15 @@ jobs:
       - name: Install Lark CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/larksuite/lark-cli/main/install.sh | sh
+          echo "$HOME/.lark-cli/bin" >> $GITHUB_PATH
 
       - name: Configure Lark CLI
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
         run: |
-          lark-cli config set app.id "${{ secrets.LARK_APP_ID }}"
-          lark-cli config set app.secret "${{ secrets.LARK_APP_SECRET }}"
+          lark-cli config set app.id "$LARK_APP_ID"
+          lark-cli config set app.secret "$LARK_APP_SECRET"
 
       - name: Run calendar sync
         run: |
